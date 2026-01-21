@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import json
 from ml_model import StudentProductivityML, get_study_advice
+import os
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -292,18 +293,6 @@ def reset_data():
 
 
 # ============== RUN THE APP ==============
-if __name__ == '__main__':
-    print("=" * 50)
-    print(" AI Student Productivity Assistant Starting...")
-    print("=" * 50)
-    print(" Open your browser:")
-    print("   → http://127.0.0.1:5000")
-    print("=" * 50)
-    print(" Features:")
-    print("   • ML-powered focus predictions")
-    print("   • Personalized study recommendations")
-    print("   • Performance analytics")
-    print("   • Smart break reminders")
-    print("=" * 50)
-    
-    app.run(debug=True, port=5000)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
