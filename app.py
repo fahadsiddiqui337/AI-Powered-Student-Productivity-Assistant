@@ -6,14 +6,14 @@ Combines Machine Learning + Claude AI for personalized study help!
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import json
-from ml_model import StudentProductivityML, get_study_advice
+#from ml_model import StudentProductivityML, get_study_advice
 import os
 
 # Initialize Flask app
 app = Flask(__name__)
 
 # Initialize the ML model
-ml_model = StudentProductivityML()
+#ml_model = StudentProductivityML()
 
 # Store study sessions in memory (in real app, use a database)
 study_sessions = []
@@ -292,7 +292,3 @@ def reset_data():
     })
 
 
-# ============== RUN THE APP ==============
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
