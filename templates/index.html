@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Student Productivity Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <h1> AI Student Productivity Assistant</h1>
+            <p>Machine Learning + AI to boost your study game!</p>
+        </header>
+
+        <!-- Quick Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon"></div>
+                <div class="stat-value" id="total-sessions">{{ profile.total_sessions }}</div>
+                <div class="stat-label">Study Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"></div>
+                <div class="stat-value" id="total-hours">{{ (profile.total_study_time / 60) | round(1) }}h</div>
+                <div class="stat-label">Total Study Time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"></div>
+                <div class="stat-value" id="avg-focus">{{ profile.average_focus }}</div>
+                <div class="stat-label">Avg Focus Score</div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="content-grid">
+            
+            <!-- Start Study Session -->
+            <div class="card">
+                <h2> Start Study Session</h2>
+                <div class="form-group">
+                    <label>Subject:</label>
+                    <input type="text" id="subject" placeholder="e.g., Mathematics, History..." class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>Planned Duration (minutes):</label>
+                    <input type="number" id="duration" value="25" min="5" max="120" class="input-field">
+                </div>
+                <button onclick="startSession()" class="btn-primary">Start Session </button>
+                <div id="session-feedback" class="feedback-box"></div>
+            </div>
+
+            <!-- Active Session Timer -->
+            <div class="card" id="active-session" style="display: none;">
+                <h2> Active Session</h2>
+                <div class="timer-display">
+                    <div class="timer" id="timer">00:00</div>
+                    <div class="subject-display" id="current-subject"></div>
+                </div>
+                <div class="session-actions">
+                    <button onclick="takeBreak()" class="btn-secondary">Take Break </button>
+                    <button onclick="endSession()" class="btn-danger">End Session </button>
+                </div>
+                <div id="break-advice" class="advice-box"></div>
+            </div>
+
+            <!-- ML Insights -->
+            <div class="card">
+                <h2> AI Insights</h2>
+                <button onclick="getInsights()" class="btn-secondary">Generate Insights</button>
+                <div id="insights-display" class="insights-box"></div>
+            </div>
+
+            <!-- Get Study Tips -->
+            <div class="card">
+                <h2>Get AI Study Tips</h2>
+                <div class="form-group">
+                    <label>Subject:</label>
+                    <input type="text" id="tips-subject" placeholder="What are you studying?" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>Difficulty:</label>
+                    <select id="difficulty" class="input-field">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                <button onclick="getStudyTips()" class="btn-secondary">Get Tips </button>
+                <div id="tips-display" class="tips-box"></div>
+            </div>
+
+            <!-- Focus Predictor -->
+            <div class="card">
+                <h2> Focus Predictor</h2>
+                <p class="card-description">When should you study? Let ML decide!</p>
+                <div class="form-group">
+                    <label>Hour of Day:</label>
+                    <input type="number" id="pred-hour" value="14" min="0" max="23" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>Day (0=Mon, 6=Sun):</label>
+                    <input type="number" id="pred-day" value="1" min="0" max="6" class="input-field">
+                </div>
+                <button onclick="predictFocus()" class="btn-secondary">Predict 🔮</button>
+                <div id="prediction-display" class="prediction-box"></div>
+            </div>
+
+            <!-- Recent Sessions -->
+            <div class="card full-width">
+                <h2>Recent Sessions</h2>
+                <button onclick="loadSessions()" class="btn-secondary">Refresh</button>
+                <div id="sessions-list" class="sessions-container"></div>
+            </div>
+
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="footer-actions">
+            <button onclick="resetData()" class="btn-danger">Reset All Data</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentSession = null;
+        let timerInterval = null;
+        let elapsedMinutes = 0;
+
+        // ========== START STUDY SESSION ==========
+        async function startSession() {
+            const subject = document.getElementById('subject').value || 'General Study';
+            const duration = document.getElementById('duration').value;
+
+            const response = await fetch('/start-session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({subject, duration})
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                currentSession = data.session;
+                elapsedMinutes = 0;
+                
+                // Show feedback
+                document.getElementById('session-feedback').innerHTML = `
+                    <div class="success-msg">
+                         Session started!<br>
+                        ${data.ml_insight}<br>
+                        ${data.advice}
+                    </div>
+                `;
+
+                // Show active session card
+                document.getElementById('active-session').style.display = 'block';
+                document.getElementById('current-subject').textContent = subject;
+                
+                // Start timer
+                startTimer();
+            }
+        }
+
+        // ========== TIMER ==========
+        function startTimer() {
+            let seconds = 0;
+            timerInterval = setInterval(() => {
+                seconds++;
+                elapsedMinutes = Math.floor(seconds / 60);
+                const mins = String(elapsedMinutes).padStart(2, '0');
+                const secs = String(seconds % 60).padStart(2, '0');
+                document.getElementById('timer').textContent = `${mins}:${secs}`;
+
+                // Update break advice every 5 minutes
+                if (seconds % 300 === 0) {
+                    updateBreakAdvice();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // ========== TAKE BREAK ==========
+        function takeBreak() {
+            stopTimer();
+            alert('Take a 5-minute break! Stretch, drink water, rest your eyes ');
+            setTimeout(() => {
+                if (confirm('Break over! Ready to continue?')) {
+                    startTimer();
+                }
+            }, 300000); // 5 minutes
+        }
+
+        // ========== END SESSION ==========
+        async function endSession() {
+            if (!currentSession) return;
+
+            stopTimer();
+
+            const focusScore = prompt('How focused were you? (1-10):', '7');
+            if (!focusScore) return;
+
+            const response = await fetch('/end-session', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    session_id: currentSession.id,
+                    actual_duration: elapsedMinutes,
+                    focus_score: parseInt(focusScore),
+                    breaks: 0
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('' + data.message);
+                document.getElementById('active-session').style.display = 'none';
+                currentSession = null;
+                
+                // Refresh stats
+                location.reload();
+            }
+        }
+
+        // ========== GET AI INSIGHTS ==========
+        async function getInsights() {
+            const response = await fetch('/get-insights');
+            const data = await response.json();
+
+            const display = document.getElementById('insights-display');
+
+            if (!data.ready) {
+                display.innerHTML = `<p class="info-msg">${data.message}</p>`;
+                return;
+            }
+
+            display.innerHTML = `
+                <div class="insight-item">
+                    <strong> Best Study Time:</strong> ${data.best_study_time}
+                </div>
+                <div class="insight-item">
+                    <strong> Optimal Duration:</strong> ${data.optimal_duration}
+                </div>
+                <div class="insight-item">
+                    <strong> Performance:</strong> ${data.performance_trend}
+                </div>
+                <div class="insight-item">
+                    <strong> Statistics:</strong><br>
+                    • ${data.total_sessions} sessions completed<br>
+                    • ${data.total_hours} hours studied<br>
+                    • ${data.average_focus}/10 avg focus
+                </div>
+                <div class="advice-list">
+                    <strong> Personalized Advice:</strong><br>
+                    ${data.advice.map(a => `• ${a}`).join('<br>')}
+                </div>
+            `;
+        }
+
+        // ========== GET STUDY TIPS ==========
+        async function getStudyTips() {
+            const subject = document.getElementById('tips-subject').value;
+            const difficulty = document.getElementById('difficulty').value;
+
+            const response = await fetch('/get-ai-tips', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({subject, difficulty})
+            });
+
+            const data = await response.json();
+
+            document.getElementById('tips-display').innerHTML = `
+                <div class="tips-list">
+                    <h3>Tips for ${data.subject} (${data.difficulty}):</h3>
+                    ${data.tips.map(tip => `<div class="tip-item">${tip}</div>`).join('')}
+                </div>
+            `;
+        }
+
+        // ========== PREDICT FOCUS ==========
+        async function predictFocus() {
+            const hour = document.getElementById('pred-hour').value;
+            const day = document.getElementById('pred-day').value;
+
+            const response = await fetch('/predict-focus', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({hour, day, duration: 25})
+            });
+
+            const data = await response.json();
+
+            document.getElementById('prediction-display').innerHTML = `
+                <div class="prediction-result">
+                    <div class="focus-score">${data.predicted_focus}/10</div>
+                    <p>${data.interpretation}</p>
+                    <small>Confidence: ${data.confidence}</small>
+                </div>
+            `;
+        }
+
+        // ========== LOAD SESSIONS ==========
+        async function loadSessions() {
+            const response = await fetch('/get-sessions');
+            const data = await response.json();
+
+            const display = document.getElementById('sessions-list');
+
+            if (data.sessions.length === 0) {
+                display.innerHTML = '<p class="info-msg">No sessions yet. Start studying!</p>';
+                return;
+            }
+
+            display.innerHTML = data.sessions.map(s => `
+                <div class="session-item">
+                    <strong>${s.subject}</strong><br>
+                    Duration: ${s.duration} min | Focus: ${s.focus_score}/10<br>
+                    <small>${s.start_time}</small>
+                </div>
+            `).join('');
+        }
+
+        // ========== RESET DATA ==========
+        async function resetData() {
+            if (!confirm('Are you sure you want to reset all data?')) return;
+
+            await fetch('/reset', {method: 'POST'});
+            alert('All data reset!');
+            location.reload();
+        }
+
+        // Update break advice
+        function updateBreakAdvice() {
+            // This could call the backend for real-time advice
+            const advice = elapsedMinutes < 25 ? 
+                "Keep going! " : 
+                "Consider a break soon ";
+            document.getElementById('break-advice').textContent = advice;
+        }
+
+        // Load sessions on page load
+        window.onload = () => {
+            loadSessions();
+        };
+    </script>
+</body>
+</html>
